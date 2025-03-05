@@ -18,7 +18,12 @@ import androidx.compose.ui.unit.dp
 import com.example.amenazasandroid.ui.theme.AmenazasAndroidTheme
 import appsManager.AppsManager
 import android.provider.Settings
+import appsManager.ApkFiles
 import trafficStats.TrafficStats
+import kotlinx.coroutines.*
+import virusTotalAPI.VirusTotalHashScanner
+import android.content.Context
+import java.util.*
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -40,12 +45,27 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+fun getApiKeyFromConfig(context: Context): String {
+    return try {
+        val inputStream = context.assets.open("config.properties")
+        val properties = Properties().apply { load(inputStream) }
+        properties.getProperty("VIRUSTOTAL_API_KEY")
+    } catch (e: Exception) {
+        e.printStackTrace()
+        null
+    }.toString()
+}
+
+
 @Composable
 fun AppListScreen() {
     var showApps by remember { mutableStateOf(false) }  // Estado para mostrar apps
     var apps by remember { mutableStateOf<List<PackageInfo>>(emptyList()) }  // Estado para almacenar las apps obtenidas
     var stats : Long
     var appsManager = AppsManager()
+
+    var apkFiles = ApkFiles()
+    val scope = CoroutineScope(Dispatchers.IO)
 
     var context = LocalContext.current
     var trafficStats = TrafficStats(context)
@@ -74,6 +94,15 @@ fun AppListScreen() {
 
             val dangerousApps = appsManager.getDangerousPermissionApps(context, apps)
             Log.d("APPSDANGER", "Apps peligrosas: $dangerousApps")
+
+
+            val apiKey = getApiKeyFromConfig(context)
+            for (app in dangerousApps){
+                val apkFile = ApkFiles().getAppApkFile(context, app.first)
+                if (apkFile != null) {
+                    VirusTotalHashScanner().scanFileByHash(apkFile.absolutePath, apiKey)
+                }
+            }
 
             showApps = true // Mostrar las aplicaciones
         }) {
