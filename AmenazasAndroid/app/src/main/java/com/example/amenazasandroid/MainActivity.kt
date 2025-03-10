@@ -1,5 +1,6 @@
 package com.example.amenazasandroid
 
+import trafficStats.TrafficStats
 import android.content.Intent
 import android.content.pm.PackageInfo
 import android.os.Bundle
@@ -19,17 +20,24 @@ import com.example.amenazasandroid.ui.theme.AmenazasAndroidTheme
 import appsManager.AppsManager
 import android.provider.Settings
 import appsManager.ApkFiles
-import trafficStats.TrafficStats
 import kotlinx.coroutines.*
-import virusTotalAPI.VirusTotalHashScanner
 import android.content.Context
+import android.net.Uri
+import android.net.VpnService
+import locationAccess.LocationAccess
+import trafficStats.PacketsCapture
 import java.util.*
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val intent = Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)
+        var intent = Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)
+        startActivity(intent)
+
+        intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+            data = Uri.fromParts("package", packageName, null)
+        }
         startActivity(intent)
 
         setContent {
@@ -41,6 +49,19 @@ class MainActivity : ComponentActivity() {
                     AppListScreen()  // Muestra la lista de apps
                 }
             }
+        }
+    }
+
+    fun startVpnService() {
+        val vpnIntent = VpnService.prepare(this)
+
+        if (vpnIntent != null) {
+            // If permission not granted, ask the user for permission
+            startActivityForResult(vpnIntent, 0)
+        } else {
+            // If permission already granted, start the VPN service directly
+            val vpnServiceIntent = Intent(this, PacketsCapture::class.java)
+            startService(vpnServiceIntent)
         }
     }
 }
@@ -71,42 +92,66 @@ fun AppListScreen() {
     var trafficStats = TrafficStats(context)
     Column(modifier = Modifier.padding(16.dp)) {
         Button(onClick =  {
-            apps = appsManager.getInstalledApps(context) // Obtener aplicaciones y actualizar el estado
-            for (app in apps){
-                Log.d("APPS", "App Name ${app.packageName}")
-                var permissions = appsManager.getAppPermissions(context, app.packageName)
-                permissions.forEach { permiso ->
-                    Log.d("APPS", "Permiso: $permiso")
+            CoroutineScope(Dispatchers.Main).launch {
+                // Iniciar corutina en IO thread
+                withContext(Dispatchers.IO) {
+                    val apps = appsManager.getInstalledApps(context) // Obtener aplicaciones en segundo plano
+                    for (app in apps) {
+                        Log.d("APPS", "App Name ${app.packageName}")
+                        val permissions = appsManager.getAppPermissions(context, app.packageName)
+                        permissions.forEach { permiso ->
+                            Log.d("APPS", "Permiso: $permiso")
+                        }
+
+                        val (received, sent) = trafficStats.getDataUsageForApp(app.packageName)
+                        if (received != 0L || sent != 0L) {
+                            Log.d("TRAFFIC", "UID for ${app.packageName}: ${context.packageManager.getApplicationInfo(app.packageName, 0).uid}")
+                            Log.d("TRAFFIC", "${app.packageName}: Received $received bytes, Sent $sent bytes")
+                        }
+                    }
+
+                    // Otros procesos
+                    val foregroundApps = appsManager.getForegroundApps(context)
+                    val backgroundApps = appsManager.getBackgroundApps(context)
+                    val startupApps = appsManager.getStartupApps(context)
+
+                    Log.d("APPSFOR", "🚀 Apps en Primer Plano: $foregroundApps")
+                    Log.d("APPSBACK", "📦 Apps en Segundo Plano: $backgroundApps")
+                    Log.d("APPSSTART", "🔄 Apps de Inicio: $startupApps")
+
+
+                    val dangerousApps = appsManager.getDangerousPermissionApps(context, apps)
+                    Log.d("APPSDANGER", "Apps peligrosas: $dangerousApps")
+
+
+                    val apiKey = getApiKeyFromConfig(context)
+                    /*for (app in dangerousApps){
+                        val apkFile = ApkFiles().getAppApkFile(context, app.first)
+                        if (apkFile != null) {
+                            VirusTotalHashScanner().scanFileByHash(apkFile.absolutePath, apiKey)
+                        }
+                    }*/
+
+                    var locationAccess = LocationAccess()
+                    var locationApps = locationAccess.getAppsAndLocationType(context)
+                    for ((app, locationType) in locationApps){
+                        Log.d("LOCATION", "La app $app accedió a la ubicación usando $locationType")
+                    }
                 }
-
-
-                stats = trafficStats.getDataUsageForApp(app.packageName)
-                Log.d("TRAFFIC", "${app.packageName}: $stats bytes")
             }
 
-            val foregroundApps = appsManager.getForegroundApps(context)
-            val backgroundApps = appsManager.getBackgroundApps(context)
-            val startupApps = appsManager.getStartupApps(context)
-
-            Log.d("APPSFOR", "🚀 Apps en Primer Plano: $foregroundApps")
-            Log.d("APPSBACK", "📦 Apps en Segundo Plano: $backgroundApps")
-            Log.d("APPSSTART", "🔄 Apps de Inicio: $startupApps")
-
-            val dangerousApps = appsManager.getDangerousPermissionApps(context, apps)
-            Log.d("APPSDANGER", "Apps peligrosas: $dangerousApps")
-
-
-            val apiKey = getApiKeyFromConfig(context)
-            for (app in dangerousApps){
-                val apkFile = ApkFiles().getAppApkFile(context, app.first)
-                if (apkFile != null) {
-                    VirusTotalHashScanner().scanFileByHash(apkFile.absolutePath, apiKey)
-                }
-            }
 
             showApps = true // Mostrar las aplicaciones
         }) {
             Text(("Obtener Aplicaciones"))
+        }
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Button(onClick = {
+            // Call to start the VPN service
+            (context as? MainActivity)?.startVpnService() // Make sure to start the service
+        }) {
+            Text("Iniciar Captura de Paquetes")
         }
 
         /*Spacer(modifier = Modifier.height(16.dp))
