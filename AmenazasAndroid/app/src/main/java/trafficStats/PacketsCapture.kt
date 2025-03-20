@@ -1,69 +1,60 @@
-package trafficStats
+package com.example.trafficmonitor
 
+import android.content.Intent
 import android.net.VpnService
-import android.os.Handler
-import android.os.HandlerThread
+import android.os.IBinder
 import android.os.ParcelFileDescriptor
 import android.util.Log
 import java.io.FileInputStream
 import java.nio.ByteBuffer
-import java.nio.channels.FileChannel
 
 class PacketsCapture : VpnService() {
     private var vpnInterface: ParcelFileDescriptor? = null
-    private val packetCaptureThread = HandlerThread("PacketCaptureThread").apply { start() }
-    private val captureHandler = Handler(packetCaptureThread.looper)
 
-    override fun onCreate() {
-        super.onCreate()
-        startVpn()
-    }
-
-    private fun startVpn() {
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val builder = Builder()
+        builder.setSession("PacketMonitor")
+            .addAddress("192.168.0.1", 24) // Asignar una IP válida
+            .addDnsServer("8.8.8.8")
+            .addDnsServer("8.8.4.4")
+            .addRoute("0.0.0.0", 0)
 
-        // Asignamos una dirección IP para la interfaz de la VPN
-        builder.addAddress("10.0.0.2", 32)
-
-        // Permite que todo el tráfico pase a través de la VPN (captura todo)
-        builder.addRoute("0.0.0.0", 0) // Ruta por defecto para todo el tráfico
-
-        // Usamos servidores DNS públicos para la resolución de nombres
-        builder.addDnsServer("8.8.8.8")
-        builder.addDnsServer("8.8.4.4")
-
-        // Establecer la interfaz de la VPN
         vpnInterface = builder.establish()
 
-        // Si la VPN se establece correctamente, comenzamos a capturar los paquetes
-        vpnInterface?.let { fd ->
-            val fileInputStream = FileInputStream(fd.fileDescriptor)
-            val channel = fileInputStream.channel
-            captureHandler.post { processPackets(channel) }
+        vpnInterface?.let {
+            Thread { captureTraffic(it) }.start()
         }
+
+        return START_STICKY
     }
 
-    private fun processPackets(channel: FileChannel) {
-        val buffer = ByteBuffer.allocate(32767)  // Tamaño del buffer para capturar paquetes
-        while (!Thread.currentThread().isInterrupted) {
-            val bytesRead = channel.read(buffer)
-            if (bytesRead > 0) {
-                buffer.flip() // Establecer el buffer para leer
-                logPacket(buffer) // Loggear el paquete
-                buffer.clear() // Limpiar el buffer para el siguiente paquete
+    private fun captureTraffic(tunInterface: ParcelFileDescriptor) {
+        val inputStream = FileInputStream(tunInterface.fileDescriptor)
+        val buffer = ByteBuffer.allocate(65535)
+
+        while (true) {
+            val length = inputStream.read(buffer.array())
+            if (length > 0) {
+                Log.d("TrafficMonitor", "Captured Packet Length: $length")
+                extractIpHeader(buffer.array(), length)
             }
+            buffer.clear()
         }
     }
 
-    private fun logPacket(buffer: ByteBuffer) {
-        val timestamp = System.currentTimeMillis()
-        Log.d("TrafficCapture", "Packet intercepted at $timestamp: ${buffer.remaining()} bytes")
+    private fun extractIpHeader(packet: ByteArray, length: Int) {
+        if (length < 20) return
+
+        val sourceIp = "${packet[12].toInt() and 0xFF}.${packet[13].toInt() and 0xFF}.${packet[14].toInt() and 0xFF}.${packet[15].toInt() and 0xFF}"
+        val destIp = "${packet[16].toInt() and 0xFF}.${packet[17].toInt() and 0xFF}.${packet[18].toInt() and 0xFF}.${packet[19].toInt() and 0xFF}"
+
+        Log.d("TrafficMonitor", "IP Origen: $sourceIp -> IP Destino: $destIp")
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        captureHandler.removeCallbacksAndMessages(null)
-        packetCaptureThread.quitSafely()
-        vpnInterface?.close()  // Cerrar la interfaz de VPN cuando el servicio se detiene
+        vpnInterface?.close()
     }
+
+    override fun onBind(intent: Intent?): IBinder? = null
 }

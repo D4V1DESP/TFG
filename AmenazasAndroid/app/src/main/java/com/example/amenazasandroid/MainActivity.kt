@@ -24,11 +24,26 @@ import kotlinx.coroutines.*
 import android.content.Context
 import android.net.Uri
 import android.net.VpnService
+import androidx.activity.result.contract.ActivityResultContracts
+import com.example.trafficmonitor.PacketsCapture
+
 import locationAccess.LocationAccess
-import trafficStats.PacketsCapture
+import virusTotalAPI.VirusTotalHashScanner
 import java.util.*
 
 class MainActivity : ComponentActivity() {
+
+    private val vpnPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK) {
+            val vpnServiceIntent = Intent(this, PacketsCapture::class.java)
+            startService(vpnServiceIntent) // Iniciar la VPN
+        } else {
+            Log.e("VPN", "El usuario denegó el permiso para la VPN")
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -54,12 +69,9 @@ class MainActivity : ComponentActivity() {
 
     fun startVpnService() {
         val vpnIntent = VpnService.prepare(this)
-
         if (vpnIntent != null) {
-            // If permission not granted, ask the user for permission
-            startActivityForResult(vpnIntent, 0)
+            vpnPermissionLauncher.launch(vpnIntent) // Ahora se usa correctamente
         } else {
-            // If permission already granted, start the VPN service directly
             val vpnServiceIntent = Intent(this, PacketsCapture::class.java)
             startService(vpnServiceIntent)
         }
@@ -125,12 +137,12 @@ fun AppListScreen() {
 
 
                     val apiKey = getApiKeyFromConfig(context)
-                    /*for (app in dangerousApps){
+                    for (app in dangerousApps){
                         val apkFile = ApkFiles().getAppApkFile(context, app.first)
                         if (apkFile != null) {
-                            VirusTotalHashScanner().scanFileByHash(apkFile.absolutePath, apiKey)
+                            /*VirusTotalHashScanner().scanFileByHash(apkFile.absolutePath, apiKey)*/
                         }
-                    }*/
+                    }
 
                     var locationAccess = LocationAccess()
                     var locationApps = locationAccess.getAppsAndLocationType(context)

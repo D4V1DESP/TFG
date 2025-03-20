@@ -14,7 +14,7 @@ class TrafficStats(private val context: Context) {
 
         val bucket = NetworkStats.Bucket()
         val endTime = System.currentTimeMillis()
-        val startTime = endTime - (1000 * 60 * 60 * 24) // Última hora
+        val startTime = endTime - (1000 * 60 * 60) // Última hora
         var rxBytes = 0L
         var txBytes = 0L
 
