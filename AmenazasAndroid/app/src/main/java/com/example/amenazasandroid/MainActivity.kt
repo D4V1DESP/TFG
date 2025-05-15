@@ -28,6 +28,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import com.example.trafficmonitor.PacketsCapture
 
 import locationAccess.LocationAccess
+import processAnalisis.ProcessAnalisis
 import virusTotalAPI.VirusTotalHashScanner
 import java.util.*
 
@@ -138,17 +139,23 @@ fun AppListScreen() {
 
                     val apiKey = getApiKeyFromConfig(context)
                     for (app in dangerousApps){
-                        val apkFile = ApkFiles().getAppApkFile(context, app.first)
+                        /*val apkFile = ApkFiles().getAppApkFile(context, app.first)
                         if (apkFile != null) {
-                            /*VirusTotalHashScanner().scanFileByHash(apkFile.absolutePath, apiKey)*/
-                        }
+                            VirusTotalHashScanner().scanFileByHash(apkFile.absolutePath, apiKey)
+                        }*/
                     }
 
                     var locationAccess = LocationAccess()
-                    var locationApps = locationAccess.getAppsAndLocationType(context)
-                    for ((app, locationType) in locationApps){
-                        Log.d("LOCATION", "La app $app accedió a la ubicación usando $locationType")
+                    var recentLocationApps = locationAccess.getRecentLocationAccessApps(context)
+                    for ((app, accessType) in recentLocationApps){
+                        Log.d("Location", "App: $app - $accessType")
                     }
+
+                    var processAnalisis = ProcessAnalisis()
+                    processAnalisis.getAllProcesses()//Obtener los procesos que se ejecutan el el dispositivo desde ADB
+
+                    locationAccess.getLocationStats()//Obtener datos sobre la ubicación desde ADB
+
                 }
             }
 
