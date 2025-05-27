@@ -1,6 +1,7 @@
 package appsManager
 
 import android.content.Context
+import android.content.pm.ApplicationInfo
 import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.util.Log
@@ -12,6 +13,18 @@ class ApkFiles {
         return try {
             val packageManager: PackageManager = context.packageManager
             val packageInfo: PackageInfo = packageManager.getPackageInfo(packageName, 0)
+            val appInfo = packageInfo.applicationInfo
+
+            if (appInfo == null) {
+                Log.e("APK_FILES", "applicationInfo es null para el paquete: $packageName")
+                return null
+            }
+
+            if ((appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0 ||
+                (appInfo.flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0) {
+                Log.d("APK_FILES", "Se omitió app del sistema: $packageName")
+                return null
+            }
 
             val appSourceDir = packageInfo.applicationInfo?.sourceDir
                 ?: return null // Si el sourceDir es null, salimos

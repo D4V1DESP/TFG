@@ -29,6 +29,7 @@ class VirusTotalHashScanner {
             }
 
             override fun onResponse(call: Call, response: Response) {
+                Log.d("VIRUSTOTAL","Aplicación: $filePath")
                 Log.d("VIRUSTOTAL","Respuesta de VirusTotal: ${response.body?.string()}")
             }
         })

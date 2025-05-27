@@ -28,6 +28,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import com.example.trafficmonitor.PacketsCapture
 
 import locationAccess.LocationAccess
+import mobSFAPI.mobSFAPKScanner
 import processAnalisis.ProcessAnalisis
 import virusTotalAPI.VirusTotalHashScanner
 import java.util.*
@@ -79,11 +80,11 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-fun getApiKeyFromConfig(context: Context): String {
+fun getApiKeyFromConfig(context: Context, idApiKey: String): String {
     return try {
         val inputStream = context.assets.open("config.properties")
         val properties = Properties().apply { load(inputStream) }
-        properties.getProperty("VIRUSTOTAL_API_KEY")
+        properties.getProperty(idApiKey)
     } catch (e: Exception) {
         e.printStackTrace()
         null
@@ -137,13 +138,16 @@ fun AppListScreen() {
                     Log.d("APPSDANGER", "Apps peligrosas: $dangerousApps")
 
 
-                    val apiKey = getApiKeyFromConfig(context)
+                    val vTotalApiKey = getApiKeyFromConfig(context, "VIRUSTOTAL_API_KEY")
+                    val mobSFApiKey = getApiKeyFromConfig(context, "MOBSF_API_KEY")
                     for (app in dangerousApps){
-                        /*val apkFile = ApkFiles().getAppApkFile(context, app.first)
+                        val apkFile = ApkFiles().getAppApkFile(context, app.first)
                         if (apkFile != null) {
-                            VirusTotalHashScanner().scanFileByHash(apkFile.absolutePath, apiKey)
-                        }*/
+                            //VirusTotalHashScanner().scanFileByHash(apkFile.absolutePath, vTotalApiKey)
+                            mobSFAPKScanner().analizarAPK(mobSFApiKey, apkFile.absolutePath)
+                        }
                     }
+
 
                     var locationAccess = LocationAccess()
                     var recentLocationApps = locationAccess.getRecentLocationAccessApps(context)
