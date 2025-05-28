@@ -1,6 +1,7 @@
 package mobSFAPI
 
 import android.content.Context
+import android.content.Intent
 import android.util.Log
 import okhttp3.Call
 import okhttp3.Callback
@@ -19,7 +20,7 @@ import java.util.concurrent.TimeUnit
 
 class mobSFAPKScanner {
 
-    fun analizarAPK(apiKey: String, apkPath: String) {
+    fun analizarAPK(apiKey: String, apkPath: String, context: Context, onReportReceived: (String) -> Unit) {
         val client = OkHttpClient.Builder()
             .connectTimeout(2, TimeUnit.MINUTES)
             .readTimeout(5, TimeUnit.MINUTES)
@@ -74,13 +75,13 @@ class mobSFAPKScanner {
                     response.close()
                     Log.i("mobSF", "Análisis enviado correctamente")
 
-                    generarReportJSON(apiKey, hash)
+                    generarReportJSON(apiKey, hash, context, onReportReceived)
                 }
             })
         }
     }
 
-    fun generarReportJSON(apiKey: String, hash: String){
+    fun generarReportJSON(apiKey: String, hash: String, context: Context, onReportReceived: (String) -> Unit){
         val client = OkHttpClient.Builder()
             .connectTimeout(2, TimeUnit.MINUTES)
             .readTimeout(10, TimeUnit.MINUTES)
@@ -113,6 +114,11 @@ class mobSFAPKScanner {
                         Log.e("mobSF", "❌ Código HTTP ${it.code} - Respuesta: $json")
                     } else {
                         Log.i("mobSF", "✅ Reporte JSON recibido:\n$json")
+                        if (json != null){
+                            onReportReceived(json)
+                        } else {
+
+                        }
                     }
                 }
             }
