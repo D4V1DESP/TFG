@@ -46,6 +46,17 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.amenazasandroid.models.SharedReportViewModel
 
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.unit.sp
+import androidx.core.graphics.drawable.toBitmap
+
 
 class MainActivity : ComponentActivity() {
 
@@ -174,7 +185,7 @@ fun AppListScreen(navController: NavHostController, sharedReportViewModel: Share
                                 CoroutineScope(Dispatchers.Main).launch {
                                     try {
                                         val report = Gson().fromJson(jsonReport, AppReport::class.java)
-                                        sharedReportViewModel.report = report
+                                        sharedReportViewModel.addReport(report)
                                     }catch (e: Exception){
                                         Log.e("mobSF", "❌ Error al parsear JSON: ${e.message}")
                                     }
@@ -204,23 +215,6 @@ fun AppListScreen(navController: NavHostController, sharedReportViewModel: Share
             Text(("Obtener Aplicaciones"))
         }
         Spacer(modifier = Modifier.height(16.dp))
-
-        Column(modifier = Modifier.padding(16.dp)) {
-            Button(onClick = {
-                // Parsear JSON y preparar lista de issues
-                val gson = Gson()
-
-
-
-                showApps = true
-            }) {
-                Text("Mostrar Issues de Seguridad")
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-
-        }
 
         Button(onClick = {
             // Call to start the VPN service
@@ -276,22 +270,17 @@ fun AppResultsScreen(navController: NavHostController, viewModel: SharedReportVi
 fun AppsScreen(navController: NavHostController, sharedReportViewModel: SharedReportViewModel) {
     var expandedAppNames by remember { mutableStateOf(setOf<String>()) }
     var expandedCategories by remember { mutableStateOf(setOf<String>()) } // Estado para categorías expandidas
-    val report = sharedReportViewModel.report
-    if (report == null) {
-        Log.d("REPORTES", "$report")
-    }
+    val reports = sharedReportViewModel.reports
+    val context = LocalContext.current
 
-    val categorizedIssues = mapOf(
-        "High" to report!!.high,
-        "Warning" to report.warning,
-        "Info" to report.info,
-        "Secure" to report.secure,
-        "Hotspot" to report.hotspot
-    )
+    if (reports.isEmpty()) {
+        Log.d("REPORTES", "$reports")
+    }
+    Log.d("REPORTES", "$reports")
 
     Column(modifier = Modifier.padding(16.dp)) {
         Button(onClick = { navController.popBackStack() }) {
-            Text("⬅ Volver")
+            Text("Volver")
         }
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -300,50 +289,101 @@ fun AppsScreen(navController: NavHostController, sharedReportViewModel: SharedRe
         Spacer(modifier = Modifier.height(8.dp))
 
         LazyColumn {
-            item {
+            items(reports) { report ->
                 val appName = report.app_name
-                Column {
-                    // Fila principal con nombre + datos
+
+                val categorizedIssues = mapOf(
+                    "High" to report.high,
+                    "Warning" to report.warning,
+                    "Info" to report.info,
+                    "Secure" to report.secure,
+                    "Hotspot" to report.hotspot
+                )
+
+                Column(modifier = Modifier.padding(vertical = 8.dp)) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(8.dp)
                             .clickable {
                                 expandedAppNames = if (expandedAppNames.contains(appName)) {
                                     expandedAppNames - appName
                                 } else {
                                     expandedAppNames + appName
                                 }
-                            },
-                        horizontalArrangement = Arrangement.SpaceBetween
+                            }
+                            .padding(8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column {
-                            Text(appName, style = MaterialTheme.typography.titleMedium)
+                        // Icono y nombre juntos a la izquierda
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            // Obtener icono de la app
+                            val pm = context.packageManager
+                            val iconDrawable = try {
+                                pm.getApplicationIcon(report.file_name.dropLast(4))
+                            } catch (e: Exception) {
+                                null
+                            }
+
+                            if (iconDrawable != null) {
+                                Image(
+                                    bitmap = iconDrawable.toBitmap().asImageBitmap(),
+                                    contentDescription = "Icono de $appName",
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .clip(CircleShape),
+                                    contentScale = ContentScale.Crop
+                                )
+                            } else {
+                                Spacer(modifier = Modifier.size(40.dp))
+                            }
+
+                            Spacer(modifier = Modifier.width(12.dp))
+
+                            Column {
+                                Text(appName, style = MaterialTheme.typography.titleMedium)
+                                Text(
+                                    "Trackers: ${report.trackers}/${report.total_trackers}",
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                        }
+
+                        // Security Score dentro de círculo
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    when {
+                                        report.security_score >= 80 -> Color(0xFF4CAF50) // verde
+                                        report.security_score >= 50 -> Color(0xFFFFC107) // amarillo
+                                        else -> Color(0xFFF44336) // rojo
+                                    }
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
                             Text(
-                                "Security Score: ${report.security_score} | Trackers: ${report.trackers}/${report.total_trackers}",
-                                style = MaterialTheme.typography.bodySmall
+                                text = report.security_score.toString(),
+                                color = Color.White,
+                                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 16.sp)
                             )
                         }
-                        Icon(
-                            imageVector = if (expandedAppNames.contains(appName)) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                            contentDescription = null
-                        )
                     }
 
-                    // Detalles desplegables por categoría con plegado individual
                     if (expandedAppNames.contains(appName)) {
                         categorizedIssues.forEach { (category, issues) ->
                             if (issues.isNotEmpty()) {
+                                val categoryKey = "$appName-$category"
                                 Column {
-                                    // Título de categoría clicable para expandir/plegar
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .clickable {
-                                                expandedCategories = if (expandedCategories.contains(category)) {
-                                                    expandedCategories - category
+                                                expandedCategories = if (expandedCategories.contains(categoryKey)) {
+                                                    expandedCategories - categoryKey
                                                 } else {
-                                                    expandedCategories + category
+                                                    expandedCategories + categoryKey
                                                 }
                                             }
                                             .padding(horizontal = 8.dp, vertical = 4.dp),
@@ -354,12 +394,12 @@ fun AppsScreen(navController: NavHostController, sharedReportViewModel: SharedRe
                                             style = MaterialTheme.typography.titleSmall.copy(color = MaterialTheme.colorScheme.primary)
                                         )
                                         Icon(
-                                            imageVector = if (expandedCategories.contains(category)) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                            imageVector = if (expandedCategories.contains(categoryKey)) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                                             contentDescription = null
                                         )
                                     }
 
-                                    if (expandedCategories.contains(category)) {
+                                    if (expandedCategories.contains(categoryKey)) {
                                         issues.forEach { issue ->
                                             Column(modifier = Modifier.padding(start = 16.dp, bottom = 8.dp)) {
                                                 Text(issue.title, style = MaterialTheme.typography.titleSmall)

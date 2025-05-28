@@ -50,7 +50,7 @@ class mobSFAPKScanner {
 
             val uploadJson = JSONObject(uploadResponse.body!!.string())
             val hash = uploadJson.getString("hash")
-            Log.d("mobSF","✅ APK subido correctamente. Hash: $hash")
+            //Log.d("mobSF","✅ APK subido correctamente. Hash: $hash")
 
             // Paso 2: Escanear APK
             val scanBody = FormBody.Builder()
@@ -73,7 +73,7 @@ class mobSFAPKScanner {
                 override fun onResponse(call: Call, response: Response) {
                     // No leemos el body, solo cerramos la respuesta
                     response.close()
-                    Log.i("mobSF", "Análisis enviado correctamente")
+                    //Log.i("mobSF", "Análisis enviado correctamente")
 
                     generarReportJSON(apiKey, hash, context, onReportReceived)
                 }
@@ -113,7 +113,7 @@ class mobSFAPKScanner {
                     if (!it.isSuccessful) {
                         Log.e("mobSF", "❌ Código HTTP ${it.code} - Respuesta: $json")
                     } else {
-                        Log.i("mobSF", "✅ Reporte JSON recibido:\n$json")
+                        //Log.i("mobSF", "✅ Reporte JSON recibido:\n$json")
                         if (json != null){
                             onReportReceived(json)
                         } else {
