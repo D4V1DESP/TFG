@@ -54,5 +54,3 @@ class TrafficStats(private val context: Context) {
 
 
 }
-
-

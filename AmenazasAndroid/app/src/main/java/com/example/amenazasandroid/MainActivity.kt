@@ -1,6 +1,5 @@
 package com.example.amenazasandroid
 
-import trafficStats.TrafficStats
 import android.content.Intent
 import android.content.pm.PackageInfo
 import android.os.Bundle
@@ -56,6 +55,9 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
+import com.example.amenazasandroid.abuseIPDBAPI.AbuseIPChecker
+import trafficStats.Connections
+import trafficStats.TrafficStats
 
 
 class MainActivity : ComponentActivity() {
@@ -124,6 +126,14 @@ fun getApiKeyFromConfig(context: Context, idApiKey: String): String {
     }.toString()
 }
 
+fun isValidIPv4(ip: String?): Boolean {
+    if (ip.isNullOrBlank()) return false
+    if (ip == "0.0.0.0") return false
+
+    val regex = Regex("^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\\.|$)){4}\$")
+    return regex.matches(ip)
+}
+
 
 @Composable
 fun AppListScreen(navController: NavHostController, sharedReportViewModel: SharedReportViewModel) {
@@ -145,14 +155,13 @@ fun AppListScreen(navController: NavHostController, sharedReportViewModel: Share
             CoroutineScope(Dispatchers.Main).launch {
                 // Iniciar corutina en IO thread
                 withContext(Dispatchers.IO) {
-                    val apps = appsManager.getInstalledApps(context) // Obtener aplicaciones en segundo plano
+                    val apps = appsManager.getInstalledApps(context)
                     for (app in apps) {
                         //Log.d("APPS", "App Name ${app.packageName}")
                         val permissions = appsManager.getAppPermissions(context, app.packageName)
                         permissions.forEach { permiso ->
-                            //Log.d("APPS", "Permiso: $permiso")
+                            Log.d("APPS", "Permiso: $permiso")
                         }
-
                         val (received, sent) = trafficStats.getDataUsageForApp(app.packageName)
                         if (received != 0L || sent != 0L) {
                             Log.d("TRAFFIC", "UID for ${app.packageName}: ${context.packageManager.getApplicationInfo(app.packageName, 0).uid}")
@@ -174,12 +183,49 @@ fun AppListScreen(navController: NavHostController, sharedReportViewModel: Share
                     Log.d("APPSDANGER", "Apps peligrosas: $dangerousApps")
 
 
-                    val vTotalApiKey = getApiKeyFromConfig(context, "VIRUSTOTAL_API_KEY")
+
+                    val connec = Connections()
+                    val connections = connec.getAllActiveConnections(context)
+                    val abuseIPDBApiKey = getApiKeyFromConfig(context, "ABUSEIPDB_API_KEY")
+                    val abuseChecker = AbuseIPChecker(abuseIPDBApiKey)
+
+                    val grouped = connections.groupBy { it.packageName ?: "unknown" }
+                    val checkedIps = mutableSetOf<String>() // Declarar fuera del for
+
+                    for ((packageName, conns) in grouped) {
+                        val (rxBytes, txBytes) = trafficStats.getDataUsageForApp(packageName)
+
+                        Log.d("APP-CONNECTIONS", "📦 $packageName -> ${conns.size} conexiones")
+                        Log.d("APP-CONNECTIONS", "    Total Rx: $rxBytes bytes | Tx: $txBytes bytes")
+
+                        for (conn in conns) {
+                            val remoteIp = conn.remoteIp
+                            val remoteHost = conn.remoteHost ?: remoteIp
+                            val port = conn.remotePort
+                            val state = conn.state
+                            val proto = conn.protocol
+
+                            //Log.d("CONNECTION", "    ↳ [$proto] $remoteIp:$port ($state)")
+                            // Si la IP NO es válida, saltar esta iteración
+                            if (!isValidIPv4(remoteIp)) continue
+
+                            // Solo analizar si no se ha analizado antes
+                            if (!checkedIps.contains(remoteIp)) {
+                                checkedIps.add(remoteIp)
+                                    val result = abuseChecker.checkIp(remoteIp)
+                                    Log.d("CONNECTION-ABUSEAPI", "↳ [$proto] ($state) $result")
+                            }
+                        }
+                    }
+
+
+
+
+                    //val vTotalApiKey = getApiKeyFromConfig(context, "VIRUSTOTAL_API_KEY")
                     val mobSFApiKey = getApiKeyFromConfig(context, "MOBSF_API_KEY")
                     for (app in dangerousApps){
                         val apkFile = ApkFiles().getAppApkFile(context, app.first)
                         if (apkFile != null) {
-                            //VirusTotalHashScanner().scanFileByHash(apkFile.absolutePath, vTotalApiKey)
                             mobSFAPKScanner().analizarAPK(mobSFApiKey, apkFile.absolutePath, context) { jsonReport ->
                                 // Parsear JSON recibido y actualizar estado en el hilo principal
                                 CoroutineScope(Dispatchers.Main).launch {
@@ -193,7 +239,6 @@ fun AppListScreen(navController: NavHostController, sharedReportViewModel: Share
                             }
                         }
                     }
-
 
                     var locationAccess = LocationAccess()
                     var recentLocationApps = locationAccess.getRecentLocationAccessApps(context)
@@ -272,11 +317,6 @@ fun AppsScreen(navController: NavHostController, sharedReportViewModel: SharedRe
     var expandedCategories by remember { mutableStateOf(setOf<String>()) } // Estado para categorías expandidas
     val reports = sharedReportViewModel.reports
     val context = LocalContext.current
-
-    if (reports.isEmpty()) {
-        Log.d("REPORTES", "$reports")
-    }
-    Log.d("REPORTES", "$reports")
 
     Column(modifier = Modifier.padding(16.dp)) {
         Button(onClick = { navController.popBackStack() }) {
