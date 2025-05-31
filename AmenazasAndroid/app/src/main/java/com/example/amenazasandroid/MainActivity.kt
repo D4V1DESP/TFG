@@ -269,8 +269,6 @@ fun AppListScreen(navController: NavHostController, sharedReportViewModel: Share
                     }
 
 
-
-
                     //val vTotalApiKey = getApiKeyFromConfig(context, "VIRUSTOTAL_API_KEY")
                     val mobSFApiKey = getApiKeyFromConfig(context, "MOBSF_API_KEY")
                     for (app in dangerousApps){
