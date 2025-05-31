@@ -16,6 +16,7 @@ constraintlayout = "2.2.1"
 cardview = "1.0.0"
 gson = "2.10.1"
 navigation = "2.7.7"
+lifecycleViewmodelAndroid = "2.9.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -42,8 +43,10 @@ androidx-constraintlayout = { group = "androidx.constraintlayout", name = "const
 androidx-cardview = { group = "androidx.cardview", name = "cardview", version.ref = "cardview" }
 gson = { group = "com.google.code.gson", name = "gson", version.ref = "gson" }
 navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigation" }
+androidx-lifecycle-viewmodel-android = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-android", version.ref = "lifecycleViewmodelAndroid" }
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+
 

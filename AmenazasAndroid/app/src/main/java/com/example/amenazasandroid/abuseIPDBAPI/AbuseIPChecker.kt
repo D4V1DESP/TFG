@@ -8,6 +8,7 @@ class AbuseIPChecker(private val apiKey: String) {
 
     private val client = OkHttpClient()
 
+    // Método original que devuelve String formateado
     fun checkIp(ip: String): String {
         val url = "https://api.abuseipdb.com/api/v2/check?ipAddress=$ip"
 
@@ -34,6 +35,24 @@ class AbuseIPChecker(private val apiKey: String) {
                     "→ Country: $country | ISP: $isp\n" +
                     "→ Usage: $usageType\n" +
                     "→ Domain: $domain"
+        }
+    }
+
+    // Nuevo método que devuelve el JSONObject completo
+    fun checkIpJson(ip: String): JSONObject? {
+        val url = "https://api.abuseipdb.com/api/v2/check?ipAddress=$ip"
+
+        val request = Request.Builder()
+            .url(url)
+            .addHeader("Key", apiKey)
+            .addHeader("Accept", "application/json")
+            .build()
+
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) return null
+
+            val body = response.body?.string() ?: return null
+            return JSONObject(body).getJSONObject("data")
         }
     }
 }
