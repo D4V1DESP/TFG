@@ -708,8 +708,8 @@ fun TrafficScreen(navController: NavHostController, sharedConnectionViewModel: S
                                     Divider()
                                     Spacer(modifier = Modifier.height(16.dp))
 
-                                    // Lista de IPs para esta aplicación
-                                    reports.forEach { report ->
+                                    // Lista de IPs para esta aplicación ordenadas por abuse score (descendente)
+                                    reports.sortedByDescending { it.abuseConfidenceScore }.forEach { report ->
                                         val ipKey = "${report.packageName}-${report.ipAddress}"
 
                                         Card(
