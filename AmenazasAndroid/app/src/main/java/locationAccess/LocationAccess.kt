@@ -30,14 +30,15 @@ class LocationAccess {
         return ""
     }
 
-    fun getLocationStats() {
+    fun getLocationStats(context: Context) {
         val isRooted = checkRoot()
         if (isRooted) {
             val command = "su -c dumpsys location"  // Obtiene datos sobre la ubicación
             val result = runCommand(command)
             Log.d("LOCATION_STATS", "$result")
 
-            val stats = parseLocationStats(result)
+            val stats = parseLocationStats(result, context)
+
 
             for (entry in stats) {
                 Log.d("LOCATION_STATS","Provider: ${entry.provider}")
@@ -49,7 +50,10 @@ class LocationAccess {
                 Log.d("LOCATION_STATS","Active Duration: ${entry.activeDuration}")
                 Log.d("LOCATION_STATS","Foreground Duration: ${entry.foregroundDuration}")
                 Log.d("LOCATION_STATS","Locations: ${entry.locations}")
-                println("-----------")
+                entry.threats.forEach { threat ->
+                    Log.d("LOCATION_STATS", "- $threat")
+                }
+                Log.d("LOCATION_STATS","-----")
             }
 
         } else {
@@ -124,10 +128,11 @@ class LocationAccess {
         val totalDuration: String,
         val activeDuration: String,
         val foregroundDuration: String,
-        val locations: Int
+        val locations: Int,
+        val threats: List<String> = emptyList()
     )
 
-    fun parseLocationStats(log: String): List<LocationStatEntry> {
+    fun parseLocationStats(log: String, context: Context): List<LocationStatEntry> {
         val entries = mutableListOf<LocationStatEntry>()
 
         val providerRegex = Regex("""(gps|network|passive):""")
@@ -145,7 +150,9 @@ class LocationAccess {
 
             for (match in appDataRegex.findAll(providerBlock)) {
                 val (uid, pkg, minInt, maxInt, total, active, foreground, locs) = match.destructured
-                entries.add(
+
+                val tempEntry = mutableListOf<LocationStatEntry>()
+                tempEntry.add(
                     LocationStatEntry(
                         provider,
                         uid,
@@ -156,6 +163,22 @@ class LocationAccess {
                         active,
                         foreground,
                         locs.toInt()
+                    )
+                )
+                val detector = LocationThreatDetector(context)
+                val threats = detector.analyzeLocationStats(tempEntry)
+                entries.add(
+                    LocationStatEntry(
+                        provider,
+                        uid,
+                        pkg,
+                        minInt,
+                        maxInt,
+                        total,
+                        active,
+                        foreground,
+                        locs.toInt(),
+                        threats = threats
                     )
                 )
             }
