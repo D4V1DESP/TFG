@@ -41,7 +41,6 @@ import mobSFAPI.mobSFAPKScanner
 import processAnalisis.ProcessAnalisis
 import java.util.*
 import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
@@ -62,7 +61,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
 import com.example.amenazasandroid.abuseIPDBAPI.AbuseIPChecker
-import org.json.JSONObject
+import com.example.amenazasandroid.models.SharedLocationViewModel
 import trafficStats.Connections
 import trafficStats.TrafficStats
 
@@ -96,10 +95,11 @@ class MainActivity : ComponentActivity() {
                 val navController = rememberNavController()
                 val sharedReportViewModel = viewModel<SharedReportViewModel>()
                 val sharedConnectionViewModel = viewModel<SharedConnectionViewModel>()
+                val sharedLocationViewModel = viewModel<SharedLocationViewModel>()
 
                 NavHost(navController = navController, startDestination = Screen.Home.route) {
                     composable(Screen.Home.route) {
-                        AppListScreen(navController, sharedReportViewModel, sharedConnectionViewModel)
+                        AppListScreen(navController, sharedReportViewModel, sharedConnectionViewModel, sharedLocationViewModel)
                     }
                     composable(Screen.AppResults.route) { //Muestra los 4 botones para ver los resultados (Apps, Tráfico, Ubicación, Permisos)
                         AppResultsScreen(navController, sharedReportViewModel)
@@ -109,6 +109,9 @@ class MainActivity : ComponentActivity() {
                     }
                     composable(Screen.Traffic.route) {
                         TrafficScreen(navController, sharedConnectionViewModel)
+                    }
+                    composable(Screen.Location.route) {
+                        LocationScreen(navController, sharedLocationViewModel)
                     }
                 }
             }
@@ -147,7 +150,7 @@ fun isValidIPv4(ip: String?): Boolean {
 
 
 @Composable
-fun AppListScreen(navController: NavHostController, sharedReportViewModel: SharedReportViewModel, sharedConnectionViewModel: SharedConnectionViewModel) {
+fun AppListScreen(navController: NavHostController, sharedReportViewModel: SharedReportViewModel, sharedConnectionViewModel: SharedConnectionViewModel, sharedLocationViewModel: SharedLocationViewModel) {
     var showApps by remember { mutableStateOf(false) }  // Estado para mostrar apps
     var apps by remember { mutableStateOf<List<PackageInfo>>(emptyList()) }  // Estado para almacenar las apps obtenidas
     var issues by remember { mutableStateOf<List<IssueWithCategory>>(emptyList()) }
@@ -168,7 +171,7 @@ fun AppListScreen(navController: NavHostController, sharedReportViewModel: Share
                 withContext(Dispatchers.IO) {
                     val apps = appsManager.getInstalledApps(context)
                     for (app in apps) {
-                        //Log.d("APPS", "App Name ${app.packageName}")
+                        Log.d("APPS", "App Name ${app.packageName}")
                         val permissions = appsManager.getAppPermissions(context, app.packageName)
                         permissions.forEach { permiso ->
                             Log.d("APPS", "Permiso: $permiso")
@@ -297,8 +300,8 @@ fun AppListScreen(navController: NavHostController, sharedReportViewModel: Share
                     var processAnalisis = ProcessAnalisis()
                     processAnalisis.getAllProcesses()//Obtener los procesos que se ejecutan el el dispositivo desde ADB
 
-                    locationAccess.getLocationStats()//Obtener datos sobre la ubicación desde ADB
-
+                    val locationStats = locationAccess.getLocationStats(context)//Obtener datos sobre la ubicación desde ADB
+                    sharedLocationViewModel.updateLocationStats(locationStats)
                 }
                 navController.navigate(Screen.AppResults.route)
             }
@@ -308,13 +311,6 @@ fun AppListScreen(navController: NavHostController, sharedReportViewModel: Share
             Text(("Obtener Aplicaciones"))
         }
         Spacer(modifier = Modifier.height(16.dp))
-
-        Button(onClick = {
-            // Call to start the VPN service
-            (context as? MainActivity)?.startVpnService() // Make sure to start the service
-        }) {
-            Text("Iniciar Captura de Paquetes")
-        }
 
         /*Spacer(modifier = Modifier.height(16.dp))
         if (showApps) {
@@ -882,6 +878,105 @@ fun TrafficScreen(navController: NavHostController, sharedConnectionViewModel: S
         }
     }
 }
+
+@Composable
+fun LocationScreen(navController: NavHostController, sharedLocationViewModel: SharedLocationViewModel) {
+    val locationStats = sharedLocationViewModel.locationStats
+
+    var expandedProviders by remember { mutableStateOf(setOf<String>()) }
+    var expandedEntries by remember { mutableStateOf(setOf<String>()) }
+
+    Column(modifier = Modifier.padding(16.dp)) {
+        Button(onClick = { navController.popBackStack() }) {
+            Text("Volver")
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Text("Estadísticas de Ubicación", style = MaterialTheme.typography.headlineSmall)
+        Spacer(modifier = Modifier.height(8.dp))
+
+        LazyColumn {
+            // Agrupamos por provider para evitar repetir providers en la lista
+            val grouped = locationStats.groupBy { it.provider }
+            grouped.forEach { (provider, entries) ->
+                item {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                expandedProviders = if (expandedProviders.contains(provider)) {
+                                    expandedProviders - provider
+                                } else {
+                                    expandedProviders + provider
+                                }
+                            }
+                            .padding(8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(provider, style = MaterialTheme.typography.titleMedium)
+                        Icon(
+                            imageVector = if (expandedProviders.contains(provider)) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                            contentDescription = null
+                        )
+                    }
+                }
+
+                if (expandedProviders.contains(provider)) {
+                    items(entries) { entry ->
+                        val isExpanded = expandedEntries.contains(entry.uid)
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    expandedEntries = if (isExpanded) {
+                                        expandedEntries - entry.uid
+                                    } else {
+                                        expandedEntries + entry.uid
+                                    }
+                                }
+                                .padding(horizontal = 16.dp, vertical = 8.dp)
+                                .background(Color.LightGray.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
+                                .padding(8.dp)
+                        ) {
+                            Row(
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(entry.packageName, style = MaterialTheme.typography.titleSmall)
+                                Icon(
+                                    imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                    contentDescription = null
+                                )
+                            }
+
+                            if (isExpanded) {
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text("UID: ${entry.uid}")
+                                Text("Min Interval: ${entry.minInterval}")
+                                Text("Max Interval: ${entry.maxInterval}")
+                                Text("Total Duration: ${entry.totalDuration}")
+                                Text("Active Duration: ${entry.activeDuration}")
+                                Text("Foreground Duration: ${entry.foregroundDuration}")
+                                Text("Locations: ${entry.locations}")
+                                if (entry.threats.isNotEmpty()) {
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text("Threats:", style = MaterialTheme.typography.labelMedium)
+                                    entry.threats.forEach { threat ->
+                                        Text("- $threat", style = MaterialTheme.typography.bodySmall)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 
 @Composable
 private fun InfoRow(label: String, value: String) {

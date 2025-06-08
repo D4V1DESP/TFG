@@ -30,17 +30,18 @@ class LocationAccess {
         return ""
     }
 
-    fun getLocationStats(context: Context) {
+    fun getLocationStats(context: Context): List<LocationStatEntry> {
         val isRooted = checkRoot()
+        var stats = emptyList<LocationStatEntry>()
         if (isRooted) {
             val command = "su -c dumpsys location"  // Obtiene datos sobre la ubicación
             val result = runCommand(command)
             Log.d("LOCATION_STATS", "$result")
 
-            val stats = parseLocationStats(result, context)
+            stats = parseLocationStats(result, context)
 
 
-            for (entry in stats) {
+            /*for (entry in stats) {
                 Log.d("LOCATION_STATS","Provider: ${entry.provider}")
                 Log.d("LOCATION_STATS","App: ${entry.packageName}")
                 Log.d("LOCATION_STATS","UID: ${entry.uid}")
@@ -54,11 +55,12 @@ class LocationAccess {
                     Log.d("LOCATION_STATS", "- $threat")
                 }
                 Log.d("LOCATION_STATS","-----")
-            }
+            }*/
 
         } else {
             Log.d("LOCATION_STATS", "El dispositivo no tiene acceso root.")
         }
+        return stats
     }
 
     fun checkRoot(): Boolean {
