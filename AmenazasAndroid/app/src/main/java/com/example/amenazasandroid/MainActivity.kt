@@ -276,10 +276,10 @@ fun AppListScreen(navController: NavHostController, sharedReportViewModel: Share
                     }
 
 
-                    //val vTotalApiKey = getApiKeyFromConfig(context, "VIRUSTOTAL_API_KEY")
+                    val userInstalledApps = appsManager.getUserInstalledApps(context)
                     val mobSFApiKey = getApiKeyFromConfig(context, "MOBSF_API_KEY")
-                    for (app in dangerousApps){
-                        val apkFile = ApkFiles().getAppApkFile(context, app.first)
+                    for (app in userInstalledApps){
+                        val apkFile = ApkFiles().getAppApkFile(context, app.packageName)
                         if (apkFile != null) {
                             mobSFAPKScanner().analizarAPK(mobSFApiKey, apkFile.absolutePath, context) { jsonReport ->
                                 // Parsear JSON recibido y actualizar estado en el hilo principal
