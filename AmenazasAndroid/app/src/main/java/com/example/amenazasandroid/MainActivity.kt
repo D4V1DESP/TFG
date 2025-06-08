@@ -52,6 +52,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Android
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
@@ -367,14 +368,21 @@ fun AppsScreen(navController: NavHostController, sharedReportViewModel: SharedRe
     val context = LocalContext.current
 
     Column(modifier = Modifier.padding(16.dp)) {
-        Button(onClick = { navController.popBackStack() }) {
-            Text("Volver")
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            IconButton(onClick = { navController.popBackStack() }) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
+            }
+            Text(
+                "Reportes de Seguridad por App",
+                style = MaterialTheme.typography.headlineMedium,
+                modifier = Modifier.padding(start = 8.dp)
+            )
         }
 
         Spacer(modifier = Modifier.height(16.dp))
-
-        Text("Reportes de Seguridad por App", style = MaterialTheme.typography.headlineSmall)
-        Spacer(modifier = Modifier.height(8.dp))
 
         LazyColumn {
             items(reports) { report ->
@@ -562,14 +570,21 @@ fun TrafficScreen(navController: NavHostController, sharedConnectionViewModel: S
     }
 
     Column(modifier = Modifier.padding(16.dp)) {
-        Button(onClick = { navController.popBackStack() }) {
-            Text("Volver")
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            IconButton(onClick = { navController.popBackStack() }) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
+            }
+            Text(
+                "Análisis de Tráfico de Red",
+                style = MaterialTheme.typography.headlineMedium,
+                modifier = Modifier.padding(start = 8.dp)
+            )
         }
 
         Spacer(modifier = Modifier.height(16.dp))
-
-        Text("Análisis de Tráfico de Red", style = MaterialTheme.typography.headlineSmall)
-        Spacer(modifier = Modifier.height(8.dp))
 
         if (connectionReports.isEmpty()) {
             Text(
@@ -891,85 +906,164 @@ fun LocationScreen(navController: NavHostController, sharedLocationViewModel: Sh
     var expandedEntries by remember { mutableStateOf(setOf<String>()) }
 
     Column(modifier = Modifier.padding(16.dp)) {
-        Button(onClick = { navController.popBackStack() }) {
-            Text("Volver")
+        // Header simple
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            IconButton(onClick = { navController.popBackStack() }) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
+            }
+            Text(
+                "Estadísticas de Ubicación",
+                style = MaterialTheme.typography.headlineMedium,
+                modifier = Modifier.padding(start = 8.dp)
+            )
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        Text("Estadísticas de Ubicación", style = MaterialTheme.typography.headlineSmall)
-        Spacer(modifier = Modifier.height(8.dp))
-
-        LazyColumn {
-            // Agrupamos por provider para evitar repetir providers en la lista
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             val grouped = locationStats.groupBy { it.provider }
+
             grouped.forEach { (provider, entries) ->
                 item {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                expandedProviders = if (expandedProviders.contains(provider)) {
-                                    expandedProviders - provider
-                                } else {
-                                    expandedProviders + provider
-                                }
-                            }
-                            .padding(8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                     ) {
-                        Text(provider, style = MaterialTheme.typography.titleMedium)
-                        Icon(
-                            imageVector = if (expandedProviders.contains(provider)) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                            contentDescription = null
-                        )
-                    }
-                }
-
-                if (expandedProviders.contains(provider)) {
-                    items(entries) { entry ->
-                        val isExpanded = expandedEntries.contains(entry.uid)
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    expandedEntries = if (isExpanded) {
-                                        expandedEntries - entry.uid
-                                    } else {
-                                        expandedEntries + entry.uid
-                                    }
-                                }
-                                .padding(horizontal = 16.dp, vertical = 8.dp)
-                                .background(Color.LightGray.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
-                                .padding(8.dp)
-                        ) {
+                        Column {
+                            // Header del proveedor
                             Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        expandedProviders = if (expandedProviders.contains(provider)) {
+                                            expandedProviders - provider
+                                        } else {
+                                            expandedProviders + provider
+                                        }
+                                    }
+                                    .padding(16.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.fillMaxWidth()
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(entry.packageName, style = MaterialTheme.typography.titleSmall)
+                                Column {
+                                    Text(
+                                        provider.uppercase(),
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    Text(
+                                        "${entries.size} aplicaciones",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                                    )
+                                }
                                 Icon(
-                                    imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                    imageVector = if (expandedProviders.contains(provider))
+                                        Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                                     contentDescription = null
                                 )
                             }
 
-                            if (isExpanded) {
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text("UID: ${entry.uid}")
-                                Text("Min Interval: ${entry.minInterval}")
-                                Text("Max Interval: ${entry.maxInterval}")
-                                Text("Total Duration: ${entry.totalDuration}")
-                                Text("Active Duration: ${entry.activeDuration}")
-                                Text("Foreground Duration: ${entry.foregroundDuration}")
-                                Text("Locations: ${entry.locations}")
-                                if (entry.threats.isNotEmpty()) {
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text("Threats:", style = MaterialTheme.typography.labelMedium)
-                                    entry.threats.forEach { threat ->
-                                        Text("- $threat", style = MaterialTheme.typography.bodySmall)
+                            // Lista de aplicaciones
+                            if (expandedProviders.contains(provider)) {
+                                entries.forEach { entry ->
+                                    val isExpanded = expandedEntries.contains(entry.uid)
+                                    val hasThreats = entry.threats.isNotEmpty()
+
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable {
+                                                expandedEntries = if (isExpanded) {
+                                                    expandedEntries - entry.uid
+                                                } else {
+                                                    expandedEntries + entry.uid
+                                                }
+                                            }
+                                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                                    ) {
+                                        Row(
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text(
+                                                    entry.packageName,
+                                                    style = MaterialTheme.typography.titleSmall
+                                                )
+                                                if (hasThreats) {
+                                                    Text(
+                                                        "⚠️ ${entry.threats.size} amenaza${if (entry.threats.size > 1) "s" else ""}",
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        color = MaterialTheme.colorScheme.error
+                                                    )
+                                                }
+                                            }
+
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Text(
+                                                    "${entry.locations}",
+                                                    style = MaterialTheme.typography.labelMedium,
+                                                    color = MaterialTheme.colorScheme.primary
+                                                )
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                Icon(
+                                                    imageVector = if (isExpanded)
+                                                        Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(20.dp)
+                                                )
+                                            }
+                                        }
+
+                                        if (isExpanded) {
+                                            Spacer(modifier = Modifier.height(8.dp))
+
+                                            Card(
+                                                colors = CardDefaults.cardColors(
+                                                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                                                )
+                                            ) {
+                                                Column(modifier = Modifier.padding(12.dp)) {
+                                                    Text("UID: ${entry.uid}", style = MaterialTheme.typography.bodySmall)
+                                                    Text("Intervalo Mín: ${entry.minInterval}", style = MaterialTheme.typography.bodySmall)
+                                                    Text("Intervalo Máx: ${entry.maxInterval}", style = MaterialTheme.typography.bodySmall)
+                                                    Text("Duración Total: ${entry.totalDuration}", style = MaterialTheme.typography.bodySmall)
+                                                    Text("Duración Activa: ${entry.activeDuration}", style = MaterialTheme.typography.bodySmall)
+                                                    Text("Duración Primer Plano: ${entry.foregroundDuration}", style = MaterialTheme.typography.bodySmall)
+                                                    Text("Ubicaciones: ${entry.locations}", style = MaterialTheme.typography.bodySmall)
+
+                                                    if (entry.threats.isNotEmpty()) {
+                                                        Spacer(modifier = Modifier.height(8.dp))
+                                                        Text(
+                                                            "Amenazas:",
+                                                            style = MaterialTheme.typography.labelMedium,
+                                                            fontWeight = FontWeight.SemiBold,
+                                                            color = MaterialTheme.colorScheme.error
+                                                        )
+                                                        entry.threats.forEach { threat ->
+                                                            Text(
+                                                                "• $threat",
+                                                                style = MaterialTheme.typography.bodySmall,
+                                                                modifier = Modifier.padding(start = 8.dp)
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    if (entry != entries.last()) {
+                                        Divider(
+                                            modifier = Modifier.padding(horizontal = 16.dp),
+                                            thickness = 0.5.dp,
+                                            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                                        )
                                     }
                                 }
                             }
@@ -1025,17 +1119,17 @@ fun PermissionsScreen(navController: NavHostController) {
         return when (permission) {
             android.Manifest.permission.CAMERA -> "📷 Cámara"
             android.Manifest.permission.RECORD_AUDIO -> "🎤 Micrófono"
-            android.Manifest.permission.READ_CONTACTS -> "👥 Leer Contactos"
-            android.Manifest.permission.WRITE_CONTACTS -> "✏️ Escribir Contactos"
-            android.Manifest.permission.GET_ACCOUNTS -> "👤 Obtener Cuentas"
-            android.Manifest.permission.READ_CALL_LOG -> "📞 Leer Llamadas"
-            android.Manifest.permission.WRITE_CALL_LOG -> "📝 Escribir Llamadas"
+            android.Manifest.permission.READ_CONTACTS -> "👥 Leer contactos"
+            android.Manifest.permission.WRITE_CONTACTS -> "✏️ Modificar o borrar contactos"
+            android.Manifest.permission.GET_ACCOUNTS -> "👤 Obtener las cuentas del usuario"
+            android.Manifest.permission.READ_CALL_LOG -> "📞 Leer el historial de llamadas"
+            android.Manifest.permission.WRITE_CALL_LOG -> "📝 Modificar el historial de llamadas"
             android.Manifest.permission.SEND_SMS -> "📤 Enviar SMS"
             android.Manifest.permission.READ_SMS -> "📨 Leer SMS"
             android.Manifest.permission.ACCESS_FINE_LOCATION -> "📍 Ubicación GPS"
-            android.Manifest.permission.ACCESS_COARSE_LOCATION -> "🗺️ Ubicación Red"
-            android.Manifest.permission.READ_EXTERNAL_STORAGE -> "📁 Leer Archivos"
-            android.Manifest.permission.WRITE_EXTERNAL_STORAGE -> "💾 Escribir Archivos"
+            android.Manifest.permission.ACCESS_COARSE_LOCATION -> "🗺️ Ubicación por red"
+            android.Manifest.permission.READ_EXTERNAL_STORAGE -> "📁 Leer archivos"
+            android.Manifest.permission.WRITE_EXTERNAL_STORAGE -> "💾 Modificar archivos"
             else -> permission.substringAfterLast(".")
         }
     }
@@ -1066,14 +1160,21 @@ fun PermissionsScreen(navController: NavHostController) {
     }
 
     Column(modifier = Modifier.padding(16.dp)) {
-        Button(onClick = { navController.popBackStack() }) {
-            Text("Volver")
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            IconButton(onClick = { navController.popBackStack() }) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
+            }
+            Text(
+                "Apps Sospechosas",
+                style = MaterialTheme.typography.headlineMedium,
+                modifier = Modifier.padding(start = 8.dp)
+            )
         }
 
         Spacer(modifier = Modifier.height(16.dp))
-
-        Text("Apps Peligrosas", style = MaterialTheme.typography.headlineSmall)
-        Spacer(modifier = Modifier.height(8.dp))
 
         if (isLoading) {
             Box(
