@@ -58,6 +58,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
 import com.example.amenazasandroid.abuseIPDBAPI.AbuseIPChecker
@@ -112,6 +113,9 @@ class MainActivity : ComponentActivity() {
                     }
                     composable(Screen.Location.route) {
                         LocationScreen(navController, sharedLocationViewModel)
+                    }
+                    composable(Screen.Permissions.route) {
+                        PermissionsScreen(navController)
                     }
                 }
             }
@@ -977,6 +981,226 @@ fun LocationScreen(navController: NavHostController, sharedLocationViewModel: Sh
     }
 }
 
+@Composable
+fun PermissionsScreen(navController: NavHostController) {
+    var expandedApps by remember { mutableStateOf(setOf<String>()) }
+    var dangerousApps by remember { mutableStateOf<List<Pair<String, List<String>>>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
+    val context = LocalContext.current
+
+    // Cargar datos al iniciar
+    LaunchedEffect(Unit) {
+        withContext(Dispatchers.IO) {
+            try {
+                val appsManager = AppsManager()
+                val apps = appsManager.getUserInstalledApps(context)
+                val dangerous = appsManager.getDangerousPermissionApps(context, apps)
+                dangerousApps = dangerous.sortedByDescending { it.second.size }
+                isLoading = false
+            } catch (e: Exception) {
+                isLoading = false
+            }
+        }
+    }
+
+    // Funciones auxiliares (iguales que antes)
+    fun getAppIcon(packageName: String): Drawable? {
+        return try {
+            context.packageManager.getApplicationIcon(packageName)
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    fun getAppName(packageName: String): String {
+        return try {
+            val appInfo = context.packageManager.getApplicationInfo(packageName, 0)
+            context.packageManager.getApplicationLabel(appInfo).toString()
+        } catch (e: Exception) {
+            packageName
+        }
+    }
+
+    fun getPermissionDisplayName(permission: String): String {
+        return when (permission) {
+            android.Manifest.permission.CAMERA -> "📷 Cámara"
+            android.Manifest.permission.RECORD_AUDIO -> "🎤 Micrófono"
+            android.Manifest.permission.READ_CONTACTS -> "👥 Leer Contactos"
+            android.Manifest.permission.WRITE_CONTACTS -> "✏️ Escribir Contactos"
+            android.Manifest.permission.GET_ACCOUNTS -> "👤 Obtener Cuentas"
+            android.Manifest.permission.READ_CALL_LOG -> "📞 Leer Llamadas"
+            android.Manifest.permission.WRITE_CALL_LOG -> "📝 Escribir Llamadas"
+            android.Manifest.permission.SEND_SMS -> "📤 Enviar SMS"
+            android.Manifest.permission.READ_SMS -> "📨 Leer SMS"
+            android.Manifest.permission.ACCESS_FINE_LOCATION -> "📍 Ubicación GPS"
+            android.Manifest.permission.ACCESS_COARSE_LOCATION -> "🗺️ Ubicación Red"
+            android.Manifest.permission.READ_EXTERNAL_STORAGE -> "📁 Leer Archivos"
+            android.Manifest.permission.WRITE_EXTERNAL_STORAGE -> "💾 Escribir Archivos"
+            else -> permission.substringAfterLast(".")
+        }
+    }
+
+    @Composable
+    fun DrawableImage(drawable: Drawable?, contentDescription: String?, modifier: Modifier = Modifier) {
+        val bitmap = remember(drawable) {
+            drawable?.let {
+                val bitmap = Bitmap.createBitmap(
+                    it.intrinsicWidth,
+                    it.intrinsicHeight,
+                    Bitmap.Config.ARGB_8888
+                )
+                val canvas = Canvas(bitmap)
+                it.setBounds(0, 0, canvas.width, canvas.height)
+                it.draw(canvas)
+                bitmap.asImageBitmap()
+            }
+        }
+
+        bitmap?.let {
+            Image(
+                bitmap = it,
+                contentDescription = contentDescription,
+                modifier = modifier
+            )
+        }
+    }
+
+    Column(modifier = Modifier.padding(16.dp)) {
+        Button(onClick = { navController.popBackStack() }) {
+            Text("Volver")
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Text("Apps Peligrosas", style = MaterialTheme.typography.headlineSmall)
+        Spacer(modifier = Modifier.height(8.dp))
+
+        if (isLoading) {
+            Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator()
+            }
+        } else if (dangerousApps.isEmpty()) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFE8F5E8))
+            ) {
+                Text(
+                    "✅ ¡Genial! No hay aplicaciones con permisos peligrosos.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color(0xFF2E7D32),
+                    modifier = Modifier.padding(16.dp)
+                )
+            }
+        } else {
+            LazyColumn {
+                items(dangerousApps) { (packageName, permissions) ->
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            // Header clickeable
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        expandedApps = if (expandedApps.contains(packageName)) {
+                                            expandedApps - packageName
+                                        } else {
+                                            expandedApps + packageName
+                                        }
+                                    },
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // Icono de la app
+                                val appIcon = remember(packageName) { getAppIcon(packageName) }
+                                val appName = remember(packageName) { getAppName(packageName) }
+
+                                if (appIcon != null) {
+                                    DrawableImage(
+                                        drawable = appIcon,
+                                        contentDescription = "Icono de $appName",
+                                        modifier = Modifier
+                                            .size(40.dp)
+                                            .clip(RoundedCornerShape(8.dp))
+                                    )
+                                } else {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(40.dp)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(MaterialTheme.colorScheme.surfaceVariant),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Android,
+                                            contentDescription = "Icono por defecto",
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.width(12.dp))
+
+                                // Información de la app
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = appName,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Text(
+                                        text = packageName,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+
+                                // Contador de permisos
+                                Text(
+                                    text = "${permissions.size}",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.Bold
+                                )
+
+                                Spacer(modifier = Modifier.width(8.dp))
+
+                                Icon(
+                                    imageVector = if (expandedApps.contains(packageName))
+                                        Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+
+                            // Lista de permisos expandida
+                            if (expandedApps.contains(packageName)) {
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Divider()
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                permissions.forEach { permission ->
+                                    Text(
+                                        text = getPermissionDisplayName(permission),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        modifier = Modifier.padding(vertical = 2.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
 
 @Composable
 private fun InfoRow(label: String, value: String) {
