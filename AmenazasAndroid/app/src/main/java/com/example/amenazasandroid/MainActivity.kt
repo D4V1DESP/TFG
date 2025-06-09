@@ -145,14 +145,6 @@ fun getApiKeyFromConfig(context: Context, idApiKey: String): String {
     }.toString()
 }
 
-fun isValidIPv4(ip: String?): Boolean {
-    if (ip.isNullOrBlank()) return false
-    if (ip == "0.0.0.0") return false
-
-    val regex = Regex("^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\\.|$)){4}\$")
-    return regex.matches(ip)
-}
-
 
 @Composable
 fun AppListScreen(navController: NavHostController, sharedReportViewModel: SharedReportViewModel, sharedConnectionViewModel: SharedConnectionViewModel, sharedLocationViewModel: SharedLocationViewModel) {
@@ -221,13 +213,14 @@ fun AppListScreen(navController: NavHostController, sharedReportViewModel: Share
                             val remoteIp = conn.remoteIp
                             val state = conn.state
                             val proto = conn.protocol
+                            val ipVersion = conn.ipVersion // Nuevo campo
 
-                            // Si la IP NO es válida, saltar esta iteración
-                            if (!isValidIPv4(remoteIp)) continue
-
+                            // Las IPs ya están filtradas (sin privadas/locales) y validadas en getAllActiveConnections()
                             // Solo analizar si no se ha analizado antes
                             if (!checkedIps.contains(remoteIp)) {
                                 checkedIps.add(remoteIp)
+
+                                Log.d("CONNECTION-CHECK", "🔍 Analizando IP $ipVersion: $remoteIp")
 
                                 // Usar el nuevo metodo que devuelve JSONObject
                                 val jsonResult = abuseChecker.checkIpJson(remoteIp)
@@ -240,7 +233,8 @@ fun AppListScreen(navController: NavHostController, sharedReportViewModel: Share
                                             protocol = connection.protocol,
                                             state = connection.state,
                                             localPort = connection.localPort,
-                                            remotePort = connection.remotePort
+                                            remotePort = connection.remotePort,
+                                            ipVersion = connection.ipVersion // Añadir versión IP al detalle
                                         )
                                     }
 
@@ -262,7 +256,8 @@ fun AppListScreen(navController: NavHostController, sharedReportViewModel: Share
                                         isPublic = jsonResult.optBoolean("isPublic", true),
                                         isTor = jsonResult.optBoolean("isTor", false),
                                         totalReports = jsonResult.optInt("totalReports", 0),
-                                        lastReportedAt = jsonResult.optString("lastReportedAt", null)
+                                        lastReportedAt = jsonResult.optString("lastReportedAt", null),
+                                        ipVersion = ipVersion // Nuevo campo para la versión IP
                                     )
 
                                     // Añadir al ViewModel en el hilo principal
@@ -270,7 +265,9 @@ fun AppListScreen(navController: NavHostController, sharedReportViewModel: Share
                                         sharedConnectionViewModel.addConnectionReport(connectionReport)
                                     }
 
-                                    Log.d("CONNECTION-ABUSEAPI", "↳ [$proto] ($state) JSON: $jsonResult")
+                                    Log.d("CONNECTION-ABUSEAPI", "↳ [$proto] ($state) [$ipVersion] JSON: $jsonResult")
+                                } else {
+                                    Log.w("CONNECTION-ABUSEAPI", "⚠️ No se pudo obtener info para IP $ipVersion: $remoteIp")
                                 }
                             }
                         }
@@ -1411,14 +1408,16 @@ data class ConnectionReport(
     val isPublic: Boolean,
     val isTor: Boolean,
     val totalReports: Int,
-    val lastReportedAt: String?
+    val lastReportedAt: String?,
+    val ipVersion: String
 )
 
 data class ConnectionDetail(
     val protocol: String,
     val state: String,
     val localPort: Int,
-    val remotePort: Int
+    val remotePort: Int,
+    val ipVersion: String
 )
 
 
