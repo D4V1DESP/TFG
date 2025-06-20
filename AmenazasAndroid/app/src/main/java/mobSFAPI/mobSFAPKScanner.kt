@@ -225,7 +225,7 @@ class mobSFAPKScanner {
                 override fun onResponse(call: Call, response: Response) {
                     response.close()
                     Log.i("mobSF", "🔍 Análisis iniciado correctamente")
-
+                    apkFile.delete()
                     // Generar reporte después del escaneo con reintentos
                     generarReportJSONConReintentos(apiKey, serverHash, context, onReportReceived)
                 }

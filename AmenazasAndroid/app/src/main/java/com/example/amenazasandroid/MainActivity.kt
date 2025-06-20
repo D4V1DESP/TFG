@@ -220,7 +220,7 @@ fun AppListScreen(navController: NavHostController, sharedReportViewModel: Share
                             if (!checkedIps.contains(remoteIp)) {
                                 checkedIps.add(remoteIp)
 
-                                Log.d("CONNECTION-CHECK", "🔍 Analizando IP $ipVersion: $remoteIp")
+                                Log.d("CONNECTION-CHECK", "🔍 Analizando IP $packageName: $remoteIp")
 
                                 // Usar el nuevo metodo que devuelve JSONObject
                                 val jsonResult = abuseChecker.checkIpJson(remoteIp)
