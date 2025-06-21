@@ -27,6 +27,7 @@ import android.graphics.drawable.Drawable
 import android.net.Uri
 import android.net.VpnService
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -66,6 +67,7 @@ import com.example.amenazasandroid.abuseIPDBAPI.AbuseIPChecker
 import com.example.amenazasandroid.models.SharedLocationViewModel
 import trafficStats.Connections
 import trafficStats.TrafficStats
+import androidx.compose.material.icons.filled.Warning
 
 
 class MainActivity : ComponentActivity() {
@@ -238,6 +240,26 @@ fun AppListScreen(navController: NavHostController, sharedReportViewModel: Share
                                         )
                                     }
 
+                                    val reportsArray = jsonResult.optJSONArray("reports")
+                                    val abuseReports = mutableListOf<AbuseReport>()
+
+                                    if (reportsArray != null) {
+                                        for (i in 0 until reportsArray.length()) {
+                                            val reportObj = reportsArray.getJSONObject(i)
+                                            val abuseReport = AbuseReport(
+                                                reportedAt = reportObj.optString("reportedAt", null),
+                                                comment = reportObj.optString("comment", ""),
+                                                categories = reportObj.optJSONArray("categories")?.let { categoriesArray ->
+                                                    (0 until categoriesArray.length()).map { categoriesArray.getInt(it) }
+                                                } ?: emptyList(),
+                                                reporterId = reportObj.optInt("reporterId", 0),
+                                                reporterCountryCode = reportObj.optString("reporterCountryCode", "Unknown"),
+                                                reporterCountryName = reportObj.optString("reporterCountryName", "Unknown")
+                                            )
+                                            abuseReports.add(abuseReport)
+                                        }
+                                    }
+
                                     // Crear ConnectionReport
                                     val connectionReport = ConnectionReport(
                                         ipAddress = jsonResult.optString("ipAddress", remoteIp),
@@ -247,6 +269,7 @@ fun AppListScreen(navController: NavHostController, sharedReportViewModel: Share
                                         txBytes = txBytes,
                                         abuseConfidenceScore = jsonResult.optInt("abuseConfidenceScore", 0),
                                         countryCode = jsonResult.optString("countryCode", "Unknown"),
+                                        countryName = jsonResult.optString("countryName", "Unknown"),
                                         usageType = jsonResult.optString("usageType", "Unknown"),
                                         isp = jsonResult.optString("isp", "Unknown"),
                                         domain = jsonResult.optString("domain", "Unknown"),
@@ -257,7 +280,8 @@ fun AppListScreen(navController: NavHostController, sharedReportViewModel: Share
                                         isTor = jsonResult.optBoolean("isTor", false),
                                         totalReports = jsonResult.optInt("totalReports", 0),
                                         lastReportedAt = jsonResult.optString("lastReportedAt", null),
-                                        ipVersion = ipVersion // Nuevo campo para la versión IP
+                                        ipVersion = ipVersion, // Nuevo campo para la versión IP
+                                        reports = abuseReports
                                     )
 
                                     // Añadir al ViewModel en el hilo principal
@@ -516,6 +540,7 @@ fun TrafficScreen(navController: NavHostController, sharedConnectionViewModel: S
     var expandedApps by remember { mutableStateOf(setOf<String>()) }
     var expandedIPs by remember { mutableStateOf(setOf<String>()) }
     var expandedConnections by remember { mutableStateOf(setOf<String>()) }
+    var expandedReports by remember { mutableStateOf(setOf<String>()) } // Nuevo estado para reportes
     val connectionReports = sharedConnectionViewModel.connectionReports
     val context = LocalContext.current
 
@@ -539,6 +564,33 @@ fun TrafficScreen(navController: NavHostController, sharedConnectionViewModel: S
         } catch (e: Exception) {
             packageName
         }
+    }
+
+    fun getCategoryDescription(categories: List<Int>): String {
+        val categoryMap = mapOf(
+            3 to "Fraude",
+            4 to "Actividad DDoS",
+            5 to "Spam",
+            6 to "Exploit",
+            7 to "Botnet",
+            8 to "Malware",
+            9 to "Phishing",
+            10 to "Hacking",
+            11 to "Spam",
+            12 to "Suplantación",
+            13 to "Brute Force",
+            14 to "Badware",
+            15 to "Exploit",
+            16 to "Botnet",
+            17 to "Comprometido",
+            18 to "SSH",
+            19 to "IoT",
+            20 to "Abuso de base de datos",
+            21 to "Abuso de webmail",
+            22 to "SSH"
+        )
+
+        return categories.mapNotNull { categoryMap[it] }.distinct().joinToString(", ")
     }
 
     @Composable
@@ -810,6 +862,8 @@ fun TrafficScreen(navController: NavHostController, sharedConnectionViewModel: S
                                                         Spacer(modifier = Modifier.height(8.dp))
 
                                                         InfoRow("Tipo de uso", report.usageType)
+                                                        InfoRow("Proveedor de servicios", report.isp)
+                                                        InfoRow("País", report.countryName)
                                                         InfoRow("Dominio", report.domain)
                                                         InfoRow("Es Tor", if (report.isTor) "Sí" else "No")
                                                         InfoRow("Es pública", if (report.isPublic) "Sí" else "No")
@@ -824,6 +878,108 @@ fun TrafficScreen(navController: NavHostController, sharedConnectionViewModel: S
 
                                                         Spacer(modifier = Modifier.height(12.dp))
 
+                                                        if (report.reports.isNotEmpty()) {
+                                                            val reportsKey = "$ipKey-reports"
+                                                            Row(
+                                                                modifier = Modifier
+                                                                    .fillMaxWidth()
+                                                                    .clickable {
+                                                                        expandedReports = if (expandedReports.contains(reportsKey)) {
+                                                                            expandedReports - reportsKey
+                                                                        } else {
+                                                                            expandedReports + reportsKey
+                                                                        }
+                                                                    }
+                                                                    .padding(vertical = 4.dp),
+                                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                                verticalAlignment = Alignment.CenterVertically
+                                                            ) {
+                                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                                    Icon(
+                                                                        imageVector = Icons.Default.Warning,
+                                                                        contentDescription = null,
+                                                                        tint = Color(0xFFF44336),
+                                                                        modifier = Modifier.size(16.dp)
+                                                                    )
+                                                                    Spacer(modifier = Modifier.width(4.dp))
+                                                                    Text(
+                                                                        "Reportes de Abuso (${report.reports.size})",
+                                                                        style = MaterialTheme.typography.titleSmall,
+                                                                        color = MaterialTheme.colorScheme.primary
+                                                                    )
+                                                                }
+                                                                Icon(
+                                                                    imageVector = if (expandedReports.contains(reportsKey))
+                                                                        Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                                                    contentDescription = null
+                                                                )
+                                                            }
+
+                                                            if (expandedReports.contains(reportsKey)) {
+                                                                Spacer(modifier = Modifier.height(8.dp))
+
+                                                                report.reports.forEach { abuseReport ->
+                                                                    Card(
+                                                                        modifier = Modifier
+                                                                            .fillMaxWidth()
+                                                                            .padding(vertical = 2.dp),
+                                                                        colors = CardDefaults.cardColors(
+                                                                            containerColor = Color(0xFFFFF3E0) // Fondo naranja claro
+                                                                        ),
+                                                                        border = BorderStroke(1.dp, Color(0xFFFF9800))
+                                                                    ) {
+                                                                        Column(modifier = Modifier.padding(12.dp)) {
+                                                                            // Fecha y país del reportero
+                                                                            Row(
+                                                                                modifier = Modifier.fillMaxWidth(),
+                                                                                horizontalArrangement = Arrangement.SpaceBetween
+                                                                            ) {
+                                                                                Text(
+                                                                                    "📅 ${abuseReport.reportedAt}",
+                                                                                    style = MaterialTheme.typography.bodySmall,
+                                                                                    color = Color(0xFF795548)
+                                                                                )
+                                                                                Text(
+                                                                                    "🌍 ${abuseReport.reporterCountryName}",
+                                                                                    style = MaterialTheme.typography.bodySmall,
+                                                                                    color = Color(0xFF795548)
+                                                                                )
+                                                                            }
+
+                                                                            Spacer(modifier = Modifier.height(4.dp))
+
+                                                                            // Categorías de abuso
+                                                                            if (abuseReport.categories.isNotEmpty()) {
+                                                                                Text(
+                                                                                    "🏷️ ${getCategoryDescription(abuseReport.categories)}",
+                                                                                    style = MaterialTheme.typography.bodySmall,
+                                                                                    color = Color(0xFFD84315),
+                                                                                    fontWeight = FontWeight.Medium
+                                                                                )
+                                                                                Spacer(modifier = Modifier.height(4.dp))
+                                                                            }
+
+                                                                            // Comentario del reporte
+                                                                            if (abuseReport.comment.isNotEmpty()) {
+                                                                                Text(
+                                                                                    "💬 ${abuseReport.comment}",
+                                                                                    style = MaterialTheme.typography.bodySmall,
+                                                                                    color = Color(0xFF424242),
+                                                                                    modifier = Modifier
+                                                                                        .background(
+                                                                                            Color(0xFFF5F5F5),
+                                                                                            RoundedCornerShape(4.dp)
+                                                                                        )
+                                                                                        .padding(8.dp)
+                                                                                )
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+
+                                                        Spacer(modifier = Modifier.height(12.dp))
                                                         // Conexiones individuales
                                                         val connectionsKey = "$ipKey-connections"
                                                         Row(
@@ -1398,6 +1554,7 @@ data class ConnectionReport(
     val rxBytes: Long,
     val txBytes: Long,
     val abuseConfidenceScore: Int,
+    val countryName: String,
     val countryCode: String,
     val usageType: String,
     val isp: String,
@@ -1409,7 +1566,17 @@ data class ConnectionReport(
     val isTor: Boolean,
     val totalReports: Int,
     val lastReportedAt: String?,
-    val ipVersion: String
+    val ipVersion: String,
+    val reports: List<AbuseReport>
+)
+
+data class AbuseReport(
+    val reportedAt: String?,
+    val comment: String,
+    val categories: List<Int>,
+    val reporterId: Int,
+    val reporterCountryCode: String,
+    val reporterCountryName: String
 )
 
 data class ConnectionDetail(

@@ -10,7 +10,7 @@ class AbuseIPChecker(private val apiKey: String) {
 
     // Método original que devuelve String formateado
     fun checkIp(ip: String): String {
-        val url = "https://api.abuseipdb.com/api/v2/check?ipAddress=$ip"
+        val url = "https://api.abuseipdb.com/api/v2/check?ipAddress=$ip&maxAgeInDays=90&verbose"
 
         val request = Request.Builder()
             .url(url)
@@ -40,7 +40,7 @@ class AbuseIPChecker(private val apiKey: String) {
 
     // Nuevo método que devuelve el JSONObject completo
     fun checkIpJson(ip: String): JSONObject? {
-        val url = "https://api.abuseipdb.com/api/v2/check?ipAddress=$ip"
+        val url = "https://api.abuseipdb.com/api/v2/check?ipAddress=$ip&maxAgeInDays=90&verbose"
 
         val request = Request.Builder()
             .url(url)
